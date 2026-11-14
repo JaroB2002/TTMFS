@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     customDate?: string;
     customTime?: string;
     timezoneOffset?: number;
+    horizonYears?: number;
     audioMime?: string;
     audioBase64?: string;
   };
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
       customDate: payload.customDate,
       customTime: payload.customTime,
       timezoneOffset: payload.timezoneOffset,
+      horizonYears: payload.horizonYears,
     });
 
     const created = await createMessage({

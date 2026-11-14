@@ -2,8 +2,10 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { FormEvent, useMemo, useState } from "react";
+import { KineticTitle } from "@/components/KineticTitle";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
-import type { ScheduleMode, SchedulePreset } from "@/lib/schedule";
+import { YearScrubber } from "@/components/YearScrubber";
+import type { ScheduleMode } from "@/lib/schedule";
 
 type Step = "message" | "when" | "seal" | "done";
 
@@ -14,43 +16,11 @@ type Result = {
   deliverAt?: string;
 };
 
-const CHOSEN: { id: SchedulePreset; label: string; note: string }[] = [
-  { id: "tomorrow", label: "Tomorrow", note: "Next day" },
-  { id: "week", label: "One week", note: "In 7 days" },
-  { id: "month", label: "One month", note: "~30 days" },
-  { id: "year", label: "One year", note: "A full orbit" },
-  { id: "five_years", label: "Five years", note: "Far ahead" },
-  { id: "twenty_years", label: "Twenty years", note: "Almost a life" },
-  { id: "custom", label: "Exact moment", note: "Date + time" },
-  ...(process.env.NODE_ENV !== "production"
-    ? [{ id: "instant" as const, label: "Now (local)", note: "Opens instantly" }]
-    : []),
-];
-
-const RANDOM: { id: SchedulePreset; label: string; note: string }[] = [
-  { id: "week", label: "Within a week", note: "Tomorrow → 7 days" },
-  {
-    id: "surprise_year",
-    label: "Within a year",
-    note: "Any moment in 12 months",
-  },
-  {
-    id: "surprise_decade",
-    label: "Within ten years",
-    note: "A long surprise",
-  },
-  {
-    id: "surprise_lifetime",
-    label: "Within twenty years",
-    note: "Tomorrow → 20 years",
-  },
-];
-
 const panelMotion = {
-  initial: { opacity: 0, y: 28, filter: "blur(6px)" },
+  initial: { opacity: 0, y: 36, filter: "blur(8px)" },
   animate: { opacity: 1, y: 0, filter: "blur(0px)" },
-  exit: { opacity: 0, y: -16, filter: "blur(4px)" },
-  transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const },
+  exit: { opacity: 0, y: -18, filter: "blur(6px)" },
+  transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] as const },
 };
 
 export function ComposeFlow() {
@@ -60,7 +30,8 @@ export function ComposeFlow() {
     null,
   );
   const [mode, setMode] = useState<ScheduleMode>("random");
-  const [preset, setPreset] = useState<SchedulePreset>("surprise_year");
+  const [years, setYears] = useState(1);
+  const [useExact, setUseExact] = useState(false);
   const [customDate, setCustomDate] = useState("");
   const [customTime, setCustomTime] = useState("09:00");
   const [email, setEmail] = useState("");
@@ -81,14 +52,14 @@ export function ComposeFlow() {
   }, []);
 
   const canContinueMessage = body.trim().length > 0 || !!audio;
-  const showDate = mode === "chosen" && preset === "custom";
-  const showTime = mode === "chosen" && preset !== "instant";
+  const isLocal = process.env.NODE_ENV !== "production";
 
   async function seal(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
     try {
+      const usingExact = mode === "chosen" && useExact;
       const response = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -96,10 +67,10 @@ export function ComposeFlow() {
           body,
           email: email.trim() || undefined,
           mode,
-          preset,
-          customDate: preset === "custom" ? customDate : undefined,
-          customTime:
-            mode === "chosen" && preset !== "instant" ? customTime : undefined,
+          preset: usingExact ? "custom" : "horizon",
+          customDate: usingExact ? customDate : undefined,
+          customTime: mode === "chosen" ? customTime : undefined,
+          horizonYears: usingExact ? undefined : years,
           timezoneOffset: new Date().getTimezoneOffset(),
           audioMime: audio?.mime,
           audioBase64: audio?.base64,
@@ -138,6 +109,33 @@ export function ComposeFlow() {
     window.setTimeout(() => setCopied(false), 2000);
   }
 
+  async function sealInstant() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body,
+          mode: "chosen",
+          preset: "instant",
+          timezoneOffset: new Date().getTimezoneOffset(),
+          audioMime: audio?.mime,
+          audioBase64: audio?.base64,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed.");
+      setResult(data);
+      setStep("done");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="compose">
       <ol className="steps" aria-label="Steps">
@@ -163,12 +161,12 @@ export function ComposeFlow() {
 
       <AnimatePresence mode="wait">
         {step === "message" && (
-          <motion.section
-            key="message"
-            className="panel panel-frame"
-            {...panelMotion}
-          >
-            <h2>What should future-you hear?</h2>
+          <motion.section key="message" className="panel" {...panelMotion}>
+            <KineticTitle
+              as="h2"
+              className="sm"
+              lines={["What should", "future-you hear?"]}
+            />
             <p className="lede">
               A line, a promise, a question. Type it, record it — or both.
             </p>
@@ -183,7 +181,7 @@ export function ComposeFlow() {
               />
             </label>
             <div className="field">
-              <span>Or voice</span>
+              <span>Voice</span>
               <VoiceRecorder onChange={setAudio} />
             </div>
             <div className="actions">
@@ -200,15 +198,14 @@ export function ComposeFlow() {
         )}
 
         {step === "when" && (
-          <motion.section
-            key="when"
-            className="panel panel-frame"
-            {...panelMotion}
-          >
-            <h2>When does it arrive?</h2>
+          <motion.section key="when" className="panel" {...panelMotion}>
+            <KineticTitle
+              as="h2"
+              className="sm"
+              lines={["How far into", "the future?"]}
+            />
             <p className="lede">
-              Lock an exact date and time — or let chance pick a moment between
-              tomorrow and twenty years from now.
+              Drag the horizon — or lock an exact date and time of day.
             </p>
 
             <div className="mode-toggle" role="tablist">
@@ -219,58 +216,28 @@ export function ComposeFlow() {
                 className={mode === "random" ? "on" : ""}
                 onClick={() => {
                   setMode("random");
-                  setPreset("surprise_year");
+                  setUseExact(false);
                 }}
               >
-                Surprise
+                Surprise me
               </button>
               <button
                 type="button"
                 role="tab"
                 aria-selected={mode === "chosen"}
                 className={mode === "chosen" ? "on" : ""}
-                onClick={() => {
-                  setMode("chosen");
-                  setPreset("year");
-                }}
+                onClick={() => setMode("chosen")}
               >
-                Choose
+                Exact arrival
               </button>
             </div>
 
-            <div className="preset-grid">
-              {(mode === "random" ? RANDOM : CHOSEN).map((option, i) => (
-                <motion.button
-                  key={option.id}
-                  type="button"
-                  className={`preset ${preset === option.id ? "selected" : ""}`}
-                  onClick={() => setPreset(option.id)}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.04, duration: 0.35 }}
-                  whileHover={{ y: -3 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <strong>{option.label}</strong>
-                  <span>{option.note}</span>
-                </motion.button>
-              ))}
-            </div>
+            {!useExact && (
+              <YearScrubber years={years} onChange={setYears} mode={mode} />
+            )}
 
-            {showTime && (
-              <div className="field-row">
-                {showDate && (
-                  <label className="field">
-                    <span>Date</span>
-                    <input
-                      type="date"
-                      min={minDate}
-                      max={maxDate}
-                      value={customDate}
-                      onChange={(e) => setCustomDate(e.target.value)}
-                    />
-                  </label>
-                )}
+            {mode === "chosen" && (
+              <>
                 <label className="field">
                   <span>Time of day</span>
                   <input
@@ -279,7 +246,38 @@ export function ComposeFlow() {
                     onChange={(e) => setCustomTime(e.target.value)}
                   />
                 </label>
-              </div>
+
+                <button
+                  type="button"
+                  className="btn text"
+                  onClick={() => setUseExact((v) => !v)}
+                >
+                  {useExact ? "Use the scrubber instead" : "Or pick an exact date"}
+                </button>
+
+                {useExact && (
+                  <div className="exact-block field-row">
+                    <label className="field">
+                      <span>Date</span>
+                      <input
+                        type="date"
+                        min={minDate}
+                        max={maxDate}
+                        value={customDate}
+                        onChange={(e) => setCustomDate(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Time</span>
+                      <input
+                        type="time"
+                        value={customTime}
+                        onChange={(e) => setCustomTime(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="actions">
@@ -293,7 +291,7 @@ export function ComposeFlow() {
               <button
                 type="button"
                 className="btn primary"
-                disabled={mode === "chosen" && preset === "custom" && !customDate}
+                disabled={useExact && !customDate}
                 onClick={() => setStep("seal")}
               >
                 Continue
@@ -303,12 +301,12 @@ export function ComposeFlow() {
         )}
 
         {step === "seal" && (
-          <motion.section
-            key="seal"
-            className="panel panel-frame"
-            {...panelMotion}
-          >
-            <h2>Seal the capsule</h2>
+          <motion.section key="seal" className="panel" {...panelMotion}>
+            <KineticTitle
+              as="h2"
+              className="sm"
+              lines={["Seal the", "capsule"]}
+            />
             <p className="lede">
               No account. You get a secret link — that&apos;s the only key.
               Email is optional.
@@ -325,8 +323,8 @@ export function ComposeFlow() {
                 />
               </label>
               <p className="hint">
-                No newsletters. The link alone is enough to open your message
-                when the time comes.
+                No newsletters. The link alone opens your message when the time
+                comes.
               </p>
               {error && <p className="error">{error}</p>}
               <div className="actions">
@@ -337,24 +335,34 @@ export function ComposeFlow() {
                 >
                   Back
                 </button>
-                <button type="submit" className="btn primary" disabled={busy}>
+                <button type="submit" className="btn signal" disabled={busy}>
                   {busy ? "Sealing…" : "Seal it"}
                 </button>
+                {isLocal && (
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    disabled={busy}
+                    onClick={sealInstant}
+                  >
+                    Instant (local)
+                  </button>
+                )}
               </div>
             </form>
           </motion.section>
         )}
 
         {step === "done" && result && (
-          <motion.section
-            key="done"
-            className="panel panel-frame"
-            {...panelMotion}
-          >
+          <motion.section key="done" className="panel" {...panelMotion}>
             <p className="eyebrow">Sealed</p>
-            <h2>Save this link</h2>
+            <KineticTitle
+              as="h2"
+              className="sm"
+              lines={["Save this", "link"]}
+            />
             <p className="lede">
-              {result.scheduleLabel}. Open the link later — until then it stays
+              {result.scheduleLabel}. Open it later — until then it stays
               locked.
             </p>
             <div className="link-box">
@@ -369,8 +377,7 @@ export function ComposeFlow() {
               </a>
             </div>
             <p className="hint">
-              Bookmark it or drop it in your notes. Without login, this link is
-              the key.
+              Bookmark it. Without login, this link is the key.
             </p>
           </motion.section>
         )}

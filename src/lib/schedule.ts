@@ -11,6 +11,7 @@ export type SchedulePreset =
   | "surprise_decade"
   | "surprise_lifetime"
   | "custom"
+  | "horizon"
   | "instant";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -22,6 +23,7 @@ export function resolveDelivery(input: {
   customDate?: string;
   customTime?: string;
   timezoneOffset?: number;
+  horizonYears?: number;
   now?: Date;
 }): { deliverAt: Date; label: string } {
   const now = input.now ?? new Date();
@@ -39,6 +41,16 @@ export function resolveDelivery(input: {
       deliverAt: new Date(now.getTime() - 1000),
       label: "Instant (local)",
     };
+  }
+
+  if (input.preset === "horizon" && typeof input.horizonYears === "number") {
+    return resolveHorizon({
+      mode: input.mode,
+      years: clamp(input.horizonYears, 0.002, 20),
+      customTime: input.customTime,
+      timezoneOffset: offset,
+      now,
+    });
   }
 
   if (input.mode === "chosen") {
@@ -68,6 +80,36 @@ export function resolveDelivery(input: {
   return randomPreset(input.preset, now);
 }
 
+function resolveHorizon(input: {
+  mode: ScheduleMode;
+  years: number;
+  customTime?: string;
+  timezoneOffset: number;
+  now: Date;
+}): { deliverAt: Date; label: string } {
+  const time = normalizeTime(input.customTime);
+  const horizonLabel = formatHorizon(input.years);
+
+  if (input.mode === "random") {
+    const maxMs = Math.max(DAY_MS, input.years * YEAR_MS);
+    const span = Math.max(60_000, maxMs - DAY_MS);
+    const deliverAt = new Date(input.now.getTime() + DAY_MS + Math.random() * span);
+    return {
+      deliverAt,
+      label: `Sometime within ${horizonLabel}`,
+    };
+  }
+
+  const target = new Date(input.now.getTime() + input.years * YEAR_MS);
+  const local = new Date(target.getTime() - input.timezoneOffset * 60_000);
+  const dateStr = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
+  const deliverAt = wallTimeToUtc(dateStr, time, input.timezoneOffset);
+  return {
+    deliverAt,
+    label: `In ${horizonLabel} at ${formatClock(time)}`,
+  };
+}
+
 function chosenPreset(
   preset: SchedulePreset,
   now: Date,
@@ -89,14 +131,13 @@ function chosenPreset(
     throw new Error("Unknown schedule.");
   }
   const base = new Date(now.getTime() + entry.offsetMs);
-  // Read the calendar day in the visitor's timezone.
   const local = new Date(base.getTime() - timezoneOffset * 60_000);
   const dateStr = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
   const time = normalizeTime(customTime);
   const deliverAt = wallTimeToUtc(dateStr, time, timezoneOffset);
   return {
     deliverAt,
-    label: `${entry.label} at ${time}`,
+    label: `${entry.label} at ${formatClock(time)}`,
   };
 }
 
@@ -135,16 +176,16 @@ function randomPreset(
   };
   const entry = ranges[preset] ?? ranges.surprise_lifetime!;
   const span = entry.maxMs - entry.minMs;
-  const offset = entry.minMs + Math.floor(Math.random() * span);
+  const offsetMs = entry.minMs + Math.floor(Math.random() * span);
   return {
-    deliverAt: new Date(now.getTime() + offset),
+    deliverAt: new Date(now.getTime() + offsetMs),
     label: entry.label,
   };
 }
 
 function normalizeTime(customTime?: string): string {
   if (!customTime || !/^\d{2}:\d{2}$/.test(customTime)) {
-    return "12:00";
+    return "09:00";
   }
   const [h, m] = customTime.split(":").map(Number);
   if (h! > 23 || m! > 59) {
@@ -179,6 +220,28 @@ function formatWallLabel(dateStr: string, time: string): string {
   }).format(probe);
 }
 
+function formatClock(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const probe = new Date(Date.UTC(2000, 0, 1, h!, m!));
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(probe);
+}
+
+function formatHorizon(years: number): string {
+  if (years < 0.03) return "a day";
+  if (years < 0.12) return `${Math.max(1, Math.round(years * 52))} weeks`;
+  if (years < 1) return `${Math.max(1, Math.round(years * 12))} months`;
+  if (years < 1.4) return "a year";
+  return `${Math.round(years)} years`;
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
 export function formatLongDate(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {
     day: "numeric",
@@ -195,15 +258,4 @@ export function formatLongDateTime(date: Date): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
-}
-
-export function formatRelativeWait(deliverAt: Date, now = new Date()): string {
-  const ms = deliverAt.getTime() - now.getTime();
-  if (ms <= 0) return "now";
-  const days = Math.ceil(ms / DAY_MS);
-  if (days < 14) return `${days} day${days === 1 ? "" : "s"}`;
-  if (days < 60) return `${Math.ceil(days / 7)} weeks`;
-  if (days < 730) return `${Math.ceil(days / 30)} months`;
-  const years = Math.round(days / 365);
-  return `${years} year${years === 1 ? "" : "s"}`;
 }

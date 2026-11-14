@@ -10,7 +10,7 @@ export default function ComposePage() {
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          <span className="mark">TTMFS</span>
+          <span className="mark" />
           Talk to my future self
         </Link>
         <Link href="/" className="nav-link">

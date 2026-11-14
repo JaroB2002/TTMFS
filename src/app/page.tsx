@@ -1,11 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { KineticTitle } from "@/components/KineticTitle";
+import { PortalField } from "@/components/PortalField";
 
 export default function Home() {
   return (
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          <span className="mark">TTMFS</span>
+          <span className="mark" />
           Talk to my future self
         </Link>
         <Link href="/compose" className="nav-link">
@@ -14,20 +19,19 @@ export default function Home() {
       </header>
 
       <main className="hero">
-        <div className="hero-frame" aria-hidden>
-          <div className="tick" />
-          <div className="ring" />
-          <div className="ring" />
-          <div className="core" />
-        </div>
+        <PortalField />
         <p className="hero-kicker">No login · secret link · up to 20 years</p>
-        <h1 className="hero-brand">
-          Talk to my <em>future self</em>
-        </h1>
-        <p className="hero-copy">
-          Write it. Speak it. Seal it. It arrives tomorrow, in twenty years, or
-          at a random moment in between.
-        </p>
+        <KineticTitle lines={["Talk to my", "future self"]} />
+        <motion.p
+          className="hero-copy"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        >
+          Write it. Speak it. Seal it into a private capsule. It arrives
+          tomorrow, in twenty years — or at a random moment in between.
+        </motion.p>
+        <div className="hero-rule" />
         <div className="cta-row">
           <Link href="/compose" className="btn primary">
             Send to later
@@ -39,18 +43,18 @@ export default function Home() {
       </main>
 
       <section id="how" className="section">
-        <div className="section-rule" />
         <h2>One message. No account.</h2>
         <p>
-          Type or record a voice note. Pick an exact date and time, or let
-          chance choose somewhere between tomorrow and twenty years out. You
-          get a private link — keep it. Until then, everything stays sealed.
+          Type or record a voice note. Scrub how far into the future it should
+          travel — or lock an exact date and time. You get a private link. Keep
+          it. Until then, everything stays sealed.
         </p>
         <p>
-          Inspired by campaigns like <em>Talk to my younger self</em> — flipped
+          Inspired by campaigns like <em>Talk to my younger self</em>, and
+          Awwwards pieces such as Almanac and My Better Normal — flipped
           forward, for whoever you become.
         </p>
-        <Link href="/compose" className="btn primary">
+        <Link href="/compose" className="btn signal">
           Build your capsule
         </Link>
       </section>

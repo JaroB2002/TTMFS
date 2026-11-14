@@ -14,7 +14,7 @@ export default async function MessagePage({ params }: Props) {
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          <span className="mark">TTMFS</span>
+          <span className="mark" />
           Talk to my future self
         </Link>
         <Link href="/compose" className="nav-link">

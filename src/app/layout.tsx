@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Syne } from "next/font/google";
-import { Atmosphere } from "@/components/Atmosphere";
+import { IBM_Plex_Mono, Instrument_Serif, Outfit } from "next/font/google";
+import { CursorGlow } from "@/components/CursorGlow";
 import "./globals.css";
 
-const display = Syne({
+const display = Instrument_Serif({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: "400",
 });
 
-const body = Syne({
+const body = Outfit({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600"],
 });
 
 const mono = IBM_Plex_Mono({
@@ -38,7 +38,8 @@ export default function RootLayout({
         className={`${display.variable} ${body.variable} ${mono.variable} antialiased`}
       >
         <div className="site">
-          <Atmosphere />
+          <div className="site-veil" aria-hidden />
+          <CursorGlow />
           <div className="shell">{children}</div>
         </div>
       </body>
