@@ -5,7 +5,8 @@ export default function Home() {
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          Talk to my <span>future self</span>
+          <span className="mark">TTMFS</span>
+          Talk to my future self
         </Link>
         <Link href="/compose" className="nav-link">
           Begin
@@ -13,42 +14,48 @@ export default function Home() {
       </header>
 
       <main className="hero">
-        <div className="hero-visual" aria-hidden />
+        <div className="hero-frame" aria-hidden>
+          <div className="tick" />
+          <div className="ring" />
+          <div className="ring" />
+          <div className="core" />
+        </div>
+        <p className="hero-kicker">No login · secret link · up to 20 years</p>
         <h1 className="hero-brand">
           Talk to my <em>future self</em>
         </h1>
         <p className="hero-copy">
-          Spreek of schrijf iets in voor later. Het komt aan wanneer jij wilt —
-          morgen, over twintig jaar, of op een random moment.
+          Write it. Speak it. Seal it. It arrives tomorrow, in twenty years, or
+          at a random moment in between.
         </p>
         <div className="cta-row">
           <Link href="/compose" className="btn primary">
-            Verstuur naar later
+            Send to later
           </Link>
           <a href="#how" className="btn ghost">
-            Hoe het werkt
+            How it works
           </a>
         </div>
       </main>
 
       <section id="how" className="section">
-        <h2>Eén boodschap. Geen login.</h2>
+        <div className="section-rule" />
+        <h2>One message. No account.</h2>
         <p>
-          Typ of neem een spraakbericht op. Kies een datum, of laat het lot het
-          moment bepalen. Je krijgt een geheime link — bewaar die. Tot die tijd
-          blijft alles dicht.
+          Type or record a voice note. Pick an exact date and time, or let
+          chance choose somewhere between tomorrow and twenty years out. You
+          get a private link — keep it. Until then, everything stays sealed.
         </p>
         <p>
-          Geïnspireerd door campagnes als{" "}
-          <em>Talk to my younger self</em>, maar dan vooruit: een capsule voor
-          wie je nog wordt.
+          Inspired by campaigns like <em>Talk to my younger self</em> — flipped
+          forward, for whoever you become.
         </p>
         <Link href="/compose" className="btn primary">
-          Maak je capsule
+          Build your capsule
         </Link>
       </section>
 
-      <p className="footer-note">TTMFS · geen account, alleen een sleutel</p>
+      <p className="footer-note">TTMFS · sealed until arrival</p>
     </>
   );
 }

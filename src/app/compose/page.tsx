@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ComposeFlow } from "@/components/ComposeFlow";
 
 export const metadata = {
-  title: "Schrijf · Talk to my future self",
+  title: "Compose · Talk to my future self",
 };
 
 export default function ComposePage() {
@@ -10,7 +10,8 @@ export default function ComposePage() {
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          Talk to my <span>future self</span>
+          <span className="mark">TTMFS</span>
+          Talk to my future self
         </Link>
         <Link href="/" className="nav-link">
           Home

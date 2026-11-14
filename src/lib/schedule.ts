@@ -20,42 +20,49 @@ export function resolveDelivery(input: {
   mode: ScheduleMode;
   preset: SchedulePreset;
   customDate?: string;
+  customTime?: string;
+  timezoneOffset?: number;
   now?: Date;
 }): { deliverAt: Date; label: string } {
   const now = input.now ?? new Date();
+  const offset =
+    typeof input.timezoneOffset === "number" &&
+    Number.isFinite(input.timezoneOffset)
+      ? input.timezoneOffset
+      : 0;
 
   if (input.preset === "instant") {
     if (process.env.NODE_ENV === "production") {
-      throw new Error("Onbekende planning.");
+      throw new Error("Unknown schedule.");
     }
     return {
       deliverAt: new Date(now.getTime() - 1000),
-      label: "Direct (lokaal)",
+      label: "Instant (local)",
     };
   }
 
   if (input.mode === "chosen") {
     if (input.preset === "custom") {
       if (!input.customDate) {
-        throw new Error("Kies een datum.");
+        throw new Error("Pick a date.");
       }
-      const deliverAt = new Date(`${input.customDate}T12:00:00.000Z`);
+      const time = normalizeTime(input.customTime);
+      const deliverAt = wallTimeToUtc(input.customDate, time, offset);
       if (Number.isNaN(deliverAt.getTime())) {
-        throw new Error("Ongeldige datum.");
+        throw new Error("Invalid date or time.");
       }
-      const min = new Date(now.getTime() + DAY_MS);
+      const min = new Date(now.getTime() + 60 * 60 * 1000);
       const max = new Date(now.getTime() + 20 * YEAR_MS);
       if (deliverAt < min || deliverAt > max) {
-        throw new Error("Kies een datum tussen morgen en 20 jaar.");
+        throw new Error("Pick a moment between one hour from now and 20 years.");
       }
       return {
         deliverAt,
-        label: `Op ${formatLongDate(deliverAt)}`,
+        label: `On ${formatWallLabel(input.customDate, time)}`,
       };
     }
 
-    const chosen = chosenPreset(input.preset, now);
-    return chosen;
+    return chosenPreset(input.preset, now, input.customTime, offset);
   }
 
   return randomPreset(input.preset, now);
@@ -64,24 +71,32 @@ export function resolveDelivery(input: {
 function chosenPreset(
   preset: SchedulePreset,
   now: Date,
+  customTime?: string,
+  timezoneOffset = 0,
 ): { deliverAt: Date; label: string } {
   const map: Partial<
     Record<SchedulePreset, { offsetMs: number; label: string }>
   > = {
-    tomorrow: { offsetMs: DAY_MS, label: "Morgen" },
-    week: { offsetMs: 7 * DAY_MS, label: "Over een week" },
-    month: { offsetMs: 30 * DAY_MS, label: "Over een maand" },
-    year: { offsetMs: YEAR_MS, label: "Over een jaar" },
-    five_years: { offsetMs: 5 * YEAR_MS, label: "Over vijf jaar" },
-    twenty_years: { offsetMs: 20 * YEAR_MS, label: "Over twintig jaar" },
+    tomorrow: { offsetMs: DAY_MS, label: "Tomorrow" },
+    week: { offsetMs: 7 * DAY_MS, label: "In one week" },
+    month: { offsetMs: 30 * DAY_MS, label: "In one month" },
+    year: { offsetMs: YEAR_MS, label: "In one year" },
+    five_years: { offsetMs: 5 * YEAR_MS, label: "In five years" },
+    twenty_years: { offsetMs: 20 * YEAR_MS, label: "In twenty years" },
   };
   const entry = map[preset];
   if (!entry) {
-    throw new Error("Onbekende planning.");
+    throw new Error("Unknown schedule.");
   }
+  const base = new Date(now.getTime() + entry.offsetMs);
+  // Read the calendar day in the visitor's timezone.
+  const local = new Date(base.getTime() - timezoneOffset * 60_000);
+  const dateStr = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
+  const time = normalizeTime(customTime);
+  const deliverAt = wallTimeToUtc(dateStr, time, timezoneOffset);
   return {
-    deliverAt: new Date(now.getTime() + entry.offsetMs),
-    label: entry.label,
+    deliverAt,
+    label: `${entry.label} at ${time}`,
   };
 }
 
@@ -95,27 +110,27 @@ function randomPreset(
     surprise_year: {
       minMs: DAY_MS,
       maxMs: YEAR_MS,
-      label: "Ergens binnen een jaar",
+      label: "Sometime within a year",
     },
     surprise_decade: {
       minMs: YEAR_MS,
       maxMs: 10 * YEAR_MS,
-      label: "Ergens binnen tien jaar",
+      label: "Sometime within ten years",
     },
     surprise_lifetime: {
       minMs: DAY_MS,
       maxMs: 20 * YEAR_MS,
-      label: "Ergens binnen twintig jaar",
+      label: "Sometime within twenty years",
     },
     week: {
       minMs: DAY_MS,
       maxMs: 7 * DAY_MS,
-      label: "Ergens binnen een week",
+      label: "Sometime within a week",
     },
     year: {
       minMs: DAY_MS,
       maxMs: YEAR_MS,
-      label: "Ergens binnen een jaar",
+      label: "Sometime within a year",
     },
   };
   const entry = ranges[preset] ?? ranges.surprise_lifetime!;
@@ -127,22 +142,68 @@ function randomPreset(
   };
 }
 
-export function formatLongDate(date: Date): string {
-  return new Intl.DateTimeFormat("nl-NL", {
+function normalizeTime(customTime?: string): string {
+  if (!customTime || !/^\d{2}:\d{2}$/.test(customTime)) {
+    return "12:00";
+  }
+  const [h, m] = customTime.split(":").map(Number);
+  if (h! > 23 || m! > 59) {
+    throw new Error("Invalid time.");
+  }
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function wallTimeToUtc(
+  dateStr: string,
+  time: string,
+  timezoneOffsetMinutes: number,
+): Date {
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const utcMs =
+    Date.UTC(y!, mo! - 1, d!, h!, mi!, 0, 0) + timezoneOffsetMinutes * 60_000;
+  return new Date(utcMs);
+}
+
+function formatWallLabel(dateStr: string, time: string): string {
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const probe = new Date(Date.UTC(y!, mo! - 1, d!, h!, mi!));
+  return new Intl.DateTimeFormat("en-US", {
     day: "numeric",
     month: "long",
     year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
     timeZone: "UTC",
+  }).format(probe);
+}
+
+export function formatLongDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+export function formatLongDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(date);
 }
 
 export function formatRelativeWait(deliverAt: Date, now = new Date()): string {
   const ms = deliverAt.getTime() - now.getTime();
-  if (ms <= 0) return "nu";
+  if (ms <= 0) return "now";
   const days = Math.ceil(ms / DAY_MS);
-  if (days < 14) return `${days} dag${days === 1 ? "" : "en"}`;
-  if (days < 60) return `${Math.ceil(days / 7)} weken`;
-  if (days < 730) return `${Math.ceil(days / 30)} maanden`;
+  if (days < 14) return `${days} day${days === 1 ? "" : "s"}`;
+  if (days < 60) return `${Math.ceil(days / 7)} weeks`;
+  if (days < 730) return `${Math.ceil(days / 30)} months`;
   const years = Math.round(days / 365);
-  return `${years} jaar`;
+  return `${years} year${years === 1 ? "" : "s"}`;
 }

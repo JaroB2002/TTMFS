@@ -1,21 +1,30 @@
 import type { Metadata } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import { IBM_Plex_Mono, Syne } from "next/font/google";
+import { Atmosphere } from "@/components/Atmosphere";
 import "./globals.css";
 
-const display = Fraunces({
+const display = Syne({
   variable: "--font-display",
   subsets: ["latin"],
+  weight: ["600", "700", "800"],
 });
 
-const body = Manrope({
+const body = Syne({
   variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const mono = IBM_Plex_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
   title: "Talk to my future self",
   description:
-    "Schrijf of spreek een boodschap in voor je toekomstige ik. Kies wanneer die aankomt — of laat het lot beslissen.",
+    "Write or record a message for your future self. Choose when it arrives — or let chance decide.",
 };
 
 export default function RootLayout({
@@ -24,10 +33,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="nl">
-      <body className={`${display.variable} ${body.variable} antialiased`}>
+    <html lang="en">
+      <body
+        className={`${display.variable} ${body.variable} ${mono.variable} antialiased`}
+      >
         <div className="site">
-          <div className="atmosphere" aria-hidden />
+          <Atmosphere />
           <div className="shell">{children}</div>
         </div>
       </body>

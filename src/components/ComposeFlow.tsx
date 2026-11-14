@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { FormEvent, useMemo, useState } from "react";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
 import type { ScheduleMode, SchedulePreset } from "@/lib/schedule";
@@ -14,36 +15,43 @@ type Result = {
 };
 
 const CHOSEN: { id: SchedulePreset; label: string; note: string }[] = [
-  { id: "tomorrow", label: "Morgen", note: "Morgenmiddag" },
-  { id: "week", label: "Een week", note: "Over 7 dagen" },
-  { id: "month", label: "Een maand", note: "Over ~30 dagen" },
-  { id: "year", label: "Een jaar", note: "Over een jaar" },
-  { id: "five_years", label: "Vijf jaar", note: "Ver vooruit" },
-  { id: "twenty_years", label: "Twintig jaar", note: "Bijna een leven" },
-  { id: "custom", label: "Zelf kiezen", note: "Exacte datum" },
+  { id: "tomorrow", label: "Tomorrow", note: "Next day" },
+  { id: "week", label: "One week", note: "In 7 days" },
+  { id: "month", label: "One month", note: "~30 days" },
+  { id: "year", label: "One year", note: "A full orbit" },
+  { id: "five_years", label: "Five years", note: "Far ahead" },
+  { id: "twenty_years", label: "Twenty years", note: "Almost a life" },
+  { id: "custom", label: "Exact moment", note: "Date + time" },
   ...(process.env.NODE_ENV !== "production"
-    ? [{ id: "instant" as const, label: "Nu (lokaal)", note: "Meteen open" }]
+    ? [{ id: "instant" as const, label: "Now (local)", note: "Opens instantly" }]
     : []),
 ];
 
 const RANDOM: { id: SchedulePreset; label: string; note: string }[] = [
-  { id: "week", label: "Binnen een week", note: "Morgen tot 7 dagen" },
+  { id: "week", label: "Within a week", note: "Tomorrow → 7 days" },
   {
     id: "surprise_year",
-    label: "Binnen een jaar",
-    note: "Elk moment tot 12 maanden",
+    label: "Within a year",
+    note: "Any moment in 12 months",
   },
   {
     id: "surprise_decade",
-    label: "Binnen tien jaar",
-    note: "Een verrassing verderop",
+    label: "Within ten years",
+    note: "A long surprise",
   },
   {
     id: "surprise_lifetime",
-    label: "Binnen twintig jaar",
-    note: "Van morgen tot 2046",
+    label: "Within twenty years",
+    note: "Tomorrow → 20 years",
   },
 ];
+
+const panelMotion = {
+  initial: { opacity: 0, y: 28, filter: "blur(6px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -16, filter: "blur(4px)" },
+  transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const },
+};
 
 export function ComposeFlow() {
   const [step, setStep] = useState<Step>("message");
@@ -54,6 +62,7 @@ export function ComposeFlow() {
   const [mode, setMode] = useState<ScheduleMode>("random");
   const [preset, setPreset] = useState<SchedulePreset>("surprise_year");
   const [customDate, setCustomDate] = useState("");
+  const [customTime, setCustomTime] = useState("09:00");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,16 +71,18 @@ export function ComposeFlow() {
 
   const minDate = useMemo(() => {
     const d = new Date();
-    d.setUTCDate(d.getUTCDate() + 1);
+    d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
   }, []);
   const maxDate = useMemo(() => {
     const d = new Date();
-    d.setUTCFullYear(d.getUTCFullYear() + 20);
+    d.setFullYear(d.getFullYear() + 20);
     return d.toISOString().slice(0, 10);
   }, []);
 
   const canContinueMessage = body.trim().length > 0 || !!audio;
+  const showDate = mode === "chosen" && preset === "custom";
+  const showTime = mode === "chosen" && preset !== "instant";
 
   async function seal(event: FormEvent) {
     event.preventDefault();
@@ -87,13 +98,16 @@ export function ComposeFlow() {
           mode,
           preset,
           customDate: preset === "custom" ? customDate : undefined,
+          customTime:
+            mode === "chosen" && preset !== "instant" ? customTime : undefined,
+          timezoneOffset: new Date().getTimezoneOffset(),
           audioMime: audio?.mime,
           audioBase64: audio?.base64,
         }),
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Opslaan mislukt.");
+        throw new Error(data.error || "Could not seal message.");
       }
       setResult(data);
       setStep("done");
@@ -110,7 +124,7 @@ export function ComposeFlow() {
         /* ignore */
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Er ging iets mis.");
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setBusy(false);
     }
@@ -126,13 +140,13 @@ export function ComposeFlow() {
 
   return (
     <div className="compose">
-      <ol className="steps" aria-label="Stappen">
+      <ol className="steps" aria-label="Steps">
         {(
           [
-            ["message", "Boodschap"],
-            ["when", "Wanneer"],
-            ["seal", "Verzegel"],
-            ["done", "Bewaar"],
+            ["message", "Message"],
+            ["when", "When"],
+            ["seal", "Seal"],
+            ["done", "Keep"],
           ] as const
         ).map(([id, label], index) => (
           <li
@@ -147,187 +161,220 @@ export function ComposeFlow() {
         ))}
       </ol>
 
-      {step === "message" && (
-        <section className="panel reveal">
-          <h2>Wat wil je later horen?</h2>
-          <p className="lede">
-            Een zin, een belofte, een vraag. Typ het, of spreek het in — of
-            allebei.
-          </p>
-          <label className="field">
-            <span>Tekst</span>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              maxLength={8000}
-              placeholder="Hé toekomstige ik…"
-            />
-          </label>
-          <div className="field">
-            <span>Of stem</span>
-            <VoiceRecorder onChange={setAudio} />
-          </div>
-          <div className="actions">
-            <button
-              type="button"
-              className="btn primary"
-              disabled={!canContinueMessage}
-              onClick={() => setStep("when")}
-            >
-              Kies wanneer
-            </button>
-          </div>
-        </section>
-      )}
-
-      {step === "when" && (
-        <section className="panel reveal">
-          <h2>Wanneer komt het aan?</h2>
-          <p className="lede">
-            Kies een moment, of laat het lot het tijdstip bepalen — ergens
-            tussen morgen en twintig jaar.
-          </p>
-
-          <div className="mode-toggle" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "random"}
-              className={mode === "random" ? "on" : ""}
-              onClick={() => {
-                setMode("random");
-                setPreset("surprise_year");
-              }}
-            >
-              Verrassing
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "chosen"}
-              className={mode === "chosen" ? "on" : ""}
-              onClick={() => {
-                setMode("chosen");
-                setPreset("year");
-              }}
-            >
-              Zelf kiezen
-            </button>
-          </div>
-
-          <div className="preset-grid">
-            {(mode === "random" ? RANDOM : CHOSEN).map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={`preset ${preset === option.id ? "selected" : ""}`}
-                onClick={() => setPreset(option.id)}
-              >
-                <strong>{option.label}</strong>
-                <span>{option.note}</span>
-              </button>
-            ))}
-          </div>
-
-          {mode === "chosen" && preset === "custom" && (
-            <label className="field">
-              <span>Datum</span>
-              <input
-                type="date"
-                min={minDate}
-                max={maxDate}
-                value={customDate}
-                onChange={(e) => setCustomDate(e.target.value)}
-              />
-            </label>
-          )}
-
-          <div className="actions">
-            <button
-              type="button"
-              className="btn text"
-              onClick={() => setStep("message")}
-            >
-              Terug
-            </button>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={mode === "chosen" && preset === "custom" && !customDate}
-              onClick={() => setStep("seal")}
-            >
-              Verder
-            </button>
-          </div>
-        </section>
-      )}
-
-      {step === "seal" && (
-        <section className="panel reveal">
-          <h2>Verzegel je boodschap</h2>
-          <p className="lede">
-            Geen account. Je krijgt een geheime link. Bewaar die — daar komt je
-            boodschap later aan. E-mail is optioneel.
-          </p>
-          <form onSubmit={seal}>
-            <label className="field">
-              <span>E-mail (optioneel)</span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="jij@voorbeeld.nl"
-                autoComplete="email"
-              />
-            </label>
-            <p className="hint">
-              We sturen geen nieuwsbrieven. Het adres is alleen om je later te
-              kunnen wijzen op je sealed link — als e-mailverzending is
-              ingesteld. De link zelf is altijd genoeg.
+      <AnimatePresence mode="wait">
+        {step === "message" && (
+          <motion.section
+            key="message"
+            className="panel panel-frame"
+            {...panelMotion}
+          >
+            <h2>What should future-you hear?</h2>
+            <p className="lede">
+              A line, a promise, a question. Type it, record it — or both.
             </p>
-            {error && <p className="error">{error}</p>}
+            <label className="field">
+              <span>Text</span>
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={8}
+                maxLength={8000}
+                placeholder="Hey future me…"
+              />
+            </label>
+            <div className="field">
+              <span>Or voice</span>
+              <VoiceRecorder onChange={setAudio} />
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="btn primary"
+                disabled={!canContinueMessage}
+                onClick={() => setStep("when")}
+              >
+                Choose when
+              </button>
+            </div>
+          </motion.section>
+        )}
+
+        {step === "when" && (
+          <motion.section
+            key="when"
+            className="panel panel-frame"
+            {...panelMotion}
+          >
+            <h2>When does it arrive?</h2>
+            <p className="lede">
+              Lock an exact date and time — or let chance pick a moment between
+              tomorrow and twenty years from now.
+            </p>
+
+            <div className="mode-toggle" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "random"}
+                className={mode === "random" ? "on" : ""}
+                onClick={() => {
+                  setMode("random");
+                  setPreset("surprise_year");
+                }}
+              >
+                Surprise
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "chosen"}
+                className={mode === "chosen" ? "on" : ""}
+                onClick={() => {
+                  setMode("chosen");
+                  setPreset("year");
+                }}
+              >
+                Choose
+              </button>
+            </div>
+
+            <div className="preset-grid">
+              {(mode === "random" ? RANDOM : CHOSEN).map((option, i) => (
+                <motion.button
+                  key={option.id}
+                  type="button"
+                  className={`preset ${preset === option.id ? "selected" : ""}`}
+                  onClick={() => setPreset(option.id)}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04, duration: 0.35 }}
+                  whileHover={{ y: -3 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <strong>{option.label}</strong>
+                  <span>{option.note}</span>
+                </motion.button>
+              ))}
+            </div>
+
+            {showTime && (
+              <div className="field-row">
+                {showDate && (
+                  <label className="field">
+                    <span>Date</span>
+                    <input
+                      type="date"
+                      min={minDate}
+                      max={maxDate}
+                      value={customDate}
+                      onChange={(e) => setCustomDate(e.target.value)}
+                    />
+                  </label>
+                )}
+                <label className="field">
+                  <span>Time of day</span>
+                  <input
+                    type="time"
+                    value={customTime}
+                    onChange={(e) => setCustomTime(e.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+
             <div className="actions">
               <button
                 type="button"
                 className="btn text"
-                onClick={() => setStep("when")}
+                onClick={() => setStep("message")}
               >
-                Terug
+                Back
               </button>
-              <button type="submit" className="btn primary" disabled={busy}>
-                {busy ? "Verzegelen…" : "Verzegel"}
+              <button
+                type="button"
+                className="btn primary"
+                disabled={mode === "chosen" && preset === "custom" && !customDate}
+                onClick={() => setStep("seal")}
+              >
+                Continue
               </button>
             </div>
-          </form>
-        </section>
-      )}
+          </motion.section>
+        )}
 
-      {step === "done" && result && (
-        <section className="panel reveal sealed">
-          <p className="eyebrow">Verzegeld</p>
-          <h2>Bewaar deze link</h2>
-          <p className="lede">
-            {result.scheduleLabel}. Open de link later — tot die tijd blijft
-            alles dicht.
-          </p>
-          <div className="link-box">
-            <code>{`${typeof window !== "undefined" ? window.location.origin : ""}${result.revealPath}`}</code>
-          </div>
-          <div className="actions">
-            <button type="button" className="btn primary" onClick={copyLink}>
-              {copied ? "Gekopieerd" : "Kopieer link"}
-            </button>
-            <a className="btn ghost" href={result.revealPath}>
-              Open capsule
-            </a>
-          </div>
-          <p className="hint">
-            Tip: bewaar de link in je notities of favorieten. Zonder login is
-            dit de enige sleutel.
-          </p>
-        </section>
-      )}
+        {step === "seal" && (
+          <motion.section
+            key="seal"
+            className="panel panel-frame"
+            {...panelMotion}
+          >
+            <h2>Seal the capsule</h2>
+            <p className="lede">
+              No account. You get a secret link — that&apos;s the only key.
+              Email is optional.
+            </p>
+            <form onSubmit={seal}>
+              <label className="field">
+                <span>Email (optional)</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+              </label>
+              <p className="hint">
+                No newsletters. The link alone is enough to open your message
+                when the time comes.
+              </p>
+              {error && <p className="error">{error}</p>}
+              <div className="actions">
+                <button
+                  type="button"
+                  className="btn text"
+                  onClick={() => setStep("when")}
+                >
+                  Back
+                </button>
+                <button type="submit" className="btn primary" disabled={busy}>
+                  {busy ? "Sealing…" : "Seal it"}
+                </button>
+              </div>
+            </form>
+          </motion.section>
+        )}
+
+        {step === "done" && result && (
+          <motion.section
+            key="done"
+            className="panel panel-frame"
+            {...panelMotion}
+          >
+            <p className="eyebrow">Sealed</p>
+            <h2>Save this link</h2>
+            <p className="lede">
+              {result.scheduleLabel}. Open the link later — until then it stays
+              locked.
+            </p>
+            <div className="link-box">
+              <code>{`${typeof window !== "undefined" ? window.location.origin : ""}${result.revealPath}`}</code>
+            </div>
+            <div className="actions">
+              <button type="button" className="btn primary" onClick={copyLink}>
+                {copied ? "Copied" : "Copy link"}
+              </button>
+              <a className="btn ghost" href={result.revealPath}>
+                Open capsule
+              </a>
+            </div>
+            <p className="hint">
+              Bookmark it or drop it in your notes. Without login, this link is
+              the key.
+            </p>
+          </motion.section>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

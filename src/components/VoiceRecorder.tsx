@@ -101,7 +101,7 @@ export function VoiceRecorder({ onChange }: Props) {
   if (!supported) {
     return (
       <p className="hint">
-        Spraakopname werkt niet in deze browser. Je kunt nog steeds typen.
+        Voice capture isn&apos;t available in this browser. You can still type.
       </p>
     );
   }
@@ -111,7 +111,7 @@ export function VoiceRecorder({ onChange }: Props) {
       <div className="recorder-row">
         {!recording ? (
           <button type="button" className="btn ghost" onClick={start}>
-            Spreek in
+            Record
           </button>
         ) : (
           <button type="button" className="btn danger" onClick={stop}>
@@ -120,7 +120,7 @@ export function VoiceRecorder({ onChange }: Props) {
         )}
         {previewUrl && (
           <button type="button" className="btn text" onClick={clear}>
-            Wis audio
+            Clear audio
           </button>
         )}
       </div>

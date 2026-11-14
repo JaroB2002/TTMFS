@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -26,12 +27,12 @@ export function RevealClient({ token }: { token: string }) {
         const response = await fetch(`/api/messages/${token}`);
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.error || "Niet gevonden.");
+          throw new Error(data.error || "Not found.");
         }
         if (!cancelled) setView(data);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Fout");
+          setError(err instanceof Error ? err.message : "Error");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -45,21 +46,19 @@ export function RevealClient({ token }: { token: string }) {
 
   if (loading) {
     return (
-      <section className="panel reveal">
-        <p className="lede">Capsule openen…</p>
+      <section className="panel panel-frame">
+        <p className="lede">Opening capsule…</p>
       </section>
     );
   }
 
   if (error || !view) {
     return (
-      <section className="panel reveal">
-        <h1>Niet gevonden</h1>
-        <p className="lede">
-          {error || "Deze capsule bestaat niet (meer)."}
-        </p>
+      <section className="panel panel-frame">
+        <h1>Not found</h1>
+        <p className="lede">{error || "This capsule does not exist."}</p>
         <Link className="btn primary" href="/">
-          Terug naar home
+          Back home
         </Link>
       </section>
     );
@@ -67,63 +66,92 @@ export function RevealClient({ token }: { token: string }) {
 
   if (!view.unlocked) {
     return (
-      <section className="panel reveal sealed-view">
-        <p className="eyebrow">Nog verzegeld</p>
-        <h1>Nog niet nu.</h1>
+      <motion.section
+        className="panel panel-frame sealed-view"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <p className="eyebrow">Still sealed</p>
+        <h1>Not yet.</h1>
         <p className="lede">
-          Je toekomstige ik moet nog even wachten. Planning:{" "}
+          Future-you has to wait a little longer. Schedule:{" "}
           <em>{view.scheduleLabel.toLowerCase()}</em>.
         </p>
         {view.deliverAt && view.scheduleMode === "chosen" ? (
           <p className="meta">
-            Opent op{" "}
-            {new Intl.DateTimeFormat("nl-NL", {
+            Opens{" "}
+            {new Intl.DateTimeFormat("en-US", {
               day: "numeric",
               month: "long",
               year: "numeric",
-              timeZone: "UTC",
+              hour: "numeric",
+              minute: "2-digit",
             }).format(new Date(view.deliverAt))}
           </p>
         ) : (
           <p className="meta">
-            Het exacte moment blijft geheim tot de capsule vanzelf opengaat.
+            The exact moment stays hidden until the capsule unlocks on its own.
           </p>
         )}
-        <div className="seal-orb" aria-hidden />
-      </section>
+        <div className="seal-orb" aria-hidden>
+          <div className="halo" />
+          <div className="halo" />
+          <div className="core" />
+        </div>
+      </motion.section>
     );
   }
 
   return (
-    <section className="panel reveal open-view">
-      <p className="eyebrow">Voor jou, van toen</p>
-      <h1>Je boodschap is gearriveerd.</h1>
+    <motion.section
+      className="panel panel-frame open-view"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <p className="eyebrow">From then · for now</p>
+      <h1>Your message has arrived.</h1>
       <p className="meta">
-        Verzegeld{" "}
-        {new Intl.DateTimeFormat("nl-NL", {
+        Sealed{" "}
+        {new Intl.DateTimeFormat("en-US", {
           day: "numeric",
           month: "long",
           year: "numeric",
         }).format(new Date(view.createdAt))}
         {view.deliverAt
-          ? ` · gearriveerd ${new Intl.DateTimeFormat("nl-NL", {
+          ? ` · arrived ${new Intl.DateTimeFormat("en-US", {
               day: "numeric",
               month: "long",
               year: "numeric",
-              timeZone: "UTC",
+              hour: "numeric",
+              minute: "2-digit",
             }).format(new Date(view.deliverAt))}`
           : ""}
       </p>
-      {view.body ? <blockquote className="letter">{view.body}</blockquote> : null}
+      {view.body ? (
+        <motion.blockquote
+          className="letter"
+          initial={{ opacity: 0, scale: 0.96, rotate: -0.6 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{ delay: 0.15, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {view.body}
+        </motion.blockquote>
+      ) : null}
       {view.hasAudio ? (
         <div className="field">
-          <span>Stem</span>
-          <audio className="audio-preview" controls src={`/api/messages/${token}/audio`} />
+          <span>Voice</span>
+          <audio
+            className="audio-preview"
+            controls
+            src={`/api/messages/${token}/audio`}
+          />
         </div>
       ) : null}
       <Link className="btn ghost" href="/compose">
-        Stuur er nog een
+        Send another
       </Link>
-    </section>
+    </motion.section>
   );
 }

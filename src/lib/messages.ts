@@ -34,10 +34,10 @@ export async function createMessage(input: {
 }): Promise<{ id: string; token: string }> {
   const body = input.body.trim();
   if (!body && !input.audioBase64) {
-    throw new Error("Schrijf of spreek eerst een boodschap in.");
+    throw new Error("Write or record a message first.");
   }
   if (body.length > MAX_BODY) {
-    throw new Error("Je boodschap is te lang.");
+    throw new Error("Your message is too long.");
   }
 
   let audioData: Buffer | null = null;
@@ -45,7 +45,7 @@ export async function createMessage(input: {
   if (input.audioBase64) {
     audioData = Buffer.from(input.audioBase64, "base64");
     if (audioData.length > MAX_AUDIO_BYTES) {
-      throw new Error("Audio is te groot (max ~2 minuten).");
+      throw new Error("Audio is too large (max ~2 minutes).");
     }
     audioMime = input.audioMime || "audio/webm";
   }
@@ -105,7 +105,7 @@ function normalizeEmail(email?: string | null): string | null {
   const value = email.trim().toLowerCase();
   if (!value) return null;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || value.length > 254) {
-    throw new Error("Ongeldig e-mailadres.");
+    throw new Error("Invalid email address.");
   }
   return value;
 }

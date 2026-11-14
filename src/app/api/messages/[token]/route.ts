@@ -14,7 +14,7 @@ type Params = { params: Promise<{ token: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const { token } = await params;
   if (!token || token.length < 16 || token.length > 64) {
-    return NextResponse.json({ error: "Niet gevonden." }, { status: 404 });
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   const ip =
@@ -22,15 +22,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     "anonymous";
   const limited = rateLimit(`read:${ip}`, 60, 60_000);
   if (!limited.ok) {
-    return NextResponse.json(
-      { error: "Even wachten." },
-      { status: 429 },
-    );
+    return NextResponse.json({ error: "Slow down." }, { status: 429 });
   }
 
   const row = await getMessageByToken(token);
   if (!row) {
-    return NextResponse.json({ error: "Niet gevonden." }, { status: 404 });
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   if (isUnlocked(row.deliver_at)) {

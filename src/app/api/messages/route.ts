@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const limited = rateLimit(`create:${ip}`, 12, 60_000);
   if (!limited.ok) {
     return NextResponse.json(
-      { error: "Even wachten — te veel verzoeken." },
+      { error: "Slow down — too many requests." },
       { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } },
     );
   }
@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
     mode?: ScheduleMode;
     preset?: SchedulePreset;
     customDate?: string;
+    customTime?: string;
+    timezoneOffset?: number;
     audioMime?: string;
     audioBase64?: string;
   };
@@ -34,13 +36,13 @@ export async function POST(request: NextRequest) {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "Ongeldige JSON." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
   try {
     if (!payload.mode || !payload.preset) {
       return NextResponse.json(
-        { error: "Kies wanneer je boodschap aankomt." },
+        { error: "Choose when your message should arrive." },
         { status: 400 },
       );
     }
@@ -49,6 +51,8 @@ export async function POST(request: NextRequest) {
       mode: payload.mode,
       preset: payload.preset,
       customDate: payload.customDate,
+      customTime: payload.customTime,
+      timezoneOffset: payload.timezoneOffset,
     });
 
     const created = await createMessage({
@@ -65,13 +69,12 @@ export async function POST(request: NextRequest) {
       token: created.token,
       scheduleLabel: label,
       revealPath: `/m/${created.token}`,
-      // Only return the exact moment for chosen dates.
       deliverAt:
         payload.mode === "chosen" ? deliverAt.toISOString() : undefined,
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Er ging iets mis.";
+      error instanceof Error ? error.message : "Something went wrong.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

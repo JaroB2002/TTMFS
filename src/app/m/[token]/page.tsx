@@ -14,10 +14,11 @@ export default async function MessagePage({ params }: Props) {
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          Talk to my <span>future self</span>
+          <span className="mark">TTMFS</span>
+          Talk to my future self
         </Link>
         <Link href="/compose" className="nav-link">
-          Nieuwe boodschap
+          New message
         </Link>
       </header>
       <main className="reveal-page">
