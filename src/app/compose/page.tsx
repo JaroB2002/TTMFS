@@ -1,0 +1,24 @@
+import Link from "next/link";
+import { ComposeFlow } from "@/components/ComposeFlow";
+
+export const metadata = {
+  title: "Schrijf · Talk to my future self",
+};
+
+export default function ComposePage() {
+  return (
+    <>
+      <header className="topbar">
+        <Link href="/" className="brand">
+          Talk to my <span>future self</span>
+        </Link>
+        <Link href="/" className="nav-link">
+          Home
+        </Link>
+      </header>
+      <main className="compose-page">
+        <ComposeFlow />
+      </main>
+    </>
+  );
+}
