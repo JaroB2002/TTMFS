@@ -3,8 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { KineticTitle } from "@/components/KineticTitle";
-import { PortalField } from "@/components/PortalField";
+import { CapsuleMark } from "@/components/CapsuleMark";
 
 type View = {
   unlocked: boolean;
@@ -28,9 +27,7 @@ export function RevealClient({ token }: { token: string }) {
       try {
         const response = await fetch(`/api/messages/${token}`);
         const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || "Not found.");
-        }
+        if (!response.ok) throw new Error(data.error || "Not found.");
         if (!cancelled) setView(data);
       } catch (err) {
         if (!cancelled) {
@@ -57,9 +54,9 @@ export function RevealClient({ token }: { token: string }) {
   if (error || !view) {
     return (
       <section className="panel">
-        <h1 className="kinetic-title sm">Not found</h1>
+        <h1>Not found</h1>
         <p className="lede">{error || "This capsule does not exist."}</p>
-        <Link className="btn primary" href="/">
+        <Link className="btn send" href="/" style={{ width: "auto" }}>
           Back home
         </Link>
       </section>
@@ -69,13 +66,13 @@ export function RevealClient({ token }: { token: string }) {
   if (!view.unlocked) {
     return (
       <motion.section
-        className="panel sealed-view"
-        initial={{ opacity: 0, y: 28 }}
+        className="panel"
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
       >
         <p className="eyebrow">Still sealed</p>
-        <KineticTitle as="h1" className="sm" lines={["Not yet."]} />
+        <h1>Not yet.</h1>
         <p className="lede">
           Future-you has to wait a little longer. Schedule:{" "}
           <em>{view.scheduleLabel.toLowerCase()}</em>.
@@ -96,24 +93,20 @@ export function RevealClient({ token }: { token: string }) {
             The exact moment stays hidden until the capsule unlocks on its own.
           </p>
         )}
-        <PortalField className="compact" intensity={0.45} />
+        <CapsuleMark className="done-mark" />
       </motion.section>
     );
   }
 
   return (
     <motion.section
-      className="panel open-view"
-      initial={{ opacity: 0, y: 28 }}
+      className="panel"
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
     >
       <p className="eyebrow">From then · for now</p>
-      <KineticTitle
-        as="h1"
-        className="sm"
-        lines={["Your message", "has arrived."]}
-      />
+      <h1>Your message has arrived.</h1>
       <p className="meta">
         Sealed{" "}
         {new Intl.DateTimeFormat("en-US", {
@@ -131,16 +124,7 @@ export function RevealClient({ token }: { token: string }) {
             }).format(new Date(view.deliverAt))}`
           : ""}
       </p>
-      {view.body ? (
-        <motion.blockquote
-          className="letter"
-          initial={{ opacity: 0, y: 30, rotate: -1.2 }}
-          animate={{ opacity: 1, y: 0, rotate: 0 }}
-          transition={{ delay: 0.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {view.body}
-        </motion.blockquote>
-      ) : null}
+      {view.body ? <blockquote className="letter">{view.body}</blockquote> : null}
       {view.hasAudio ? (
         <div className="field">
           <span>Voice</span>
@@ -151,7 +135,7 @@ export function RevealClient({ token }: { token: string }) {
           />
         </div>
       ) : null}
-      <Link className="btn ghost" href="/compose">
+      <Link className="btn ghost" href="/">
         Send another
       </Link>
     </motion.section>

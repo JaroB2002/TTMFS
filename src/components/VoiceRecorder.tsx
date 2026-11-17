@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   onChange: (value: { mime: string; base64: string } | null) => void;
+  large?: boolean;
 };
 
-export function VoiceRecorder({ onChange }: Props) {
+export function VoiceRecorder({ onChange, large = false }: Props) {
   const [supported, setSupported] = useState(true);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -101,20 +102,25 @@ export function VoiceRecorder({ onChange }: Props) {
   if (!supported) {
     return (
       <p className="hint">
-        Voice capture isn&apos;t available in this browser. You can still type.
+        Voice capture isn’t available here. You can still type your message.
       </p>
     );
   }
 
   return (
-    <div className="recorder">
+    <div className={`recorder ${large ? "recorder-lg" : ""}`}>
       <div className="recorder-row">
         {!recording ? (
-          <button type="button" className="btn ghost" onClick={start}>
-            Record
+          <button
+            type="button"
+            className={`btn record ${large ? "record-lg" : ""}`}
+            onClick={start}
+          >
+            <span className="record-dot" />
+            {previewUrl ? "Record again" : "Start recording"}
           </button>
         ) : (
-          <button type="button" className="btn danger" onClick={stop}>
+          <button type="button" className="btn danger record-lg" onClick={stop}>
             Stop · {formatTime(seconds)}
           </button>
         )}
@@ -126,6 +132,8 @@ export function VoiceRecorder({ onChange }: Props) {
       </div>
       {recording && (
         <div className="wave" aria-hidden>
+          <span />
+          <span />
           <span />
           <span />
           <span />

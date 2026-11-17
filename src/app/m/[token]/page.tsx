@@ -17,7 +17,7 @@ export default async function MessagePage({ params }: Props) {
           <span className="mark" />
           Talk to my future self
         </Link>
-        <Link href="/compose" className="nav-link">
+        <Link href="/" className="nav-link">
           New message
         </Link>
       </header>
